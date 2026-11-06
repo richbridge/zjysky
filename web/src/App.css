@@ -1,0 +1,29 @@
+/* ==========================================
+   1. 去除所有列表样式（保持你之前的去黑点逻辑）
+   ========================================== */
+[class*="menu"] ul,
+[class*="menu"] li {
+  list-style: none !important;
+  list-style-type: none !important;
+}
+
+[class*="menu"] ul {
+  margin: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* ==========================================
+   2. 一级菜单：靠左对齐，去掉默认的内边距
+   ========================================== */
+.kd-menu-item-title,
+.kd-menu-submenu-title {
+  display: flex !important;
+  justify-content: flex-start !important; /* 靠左对齐 */
+  align-items: center !important;
+}
+
+
+/* 图标和文字的间距 */
+.kd-menu-item-icon {
+  margin-right: 0.5em !important;
+}
