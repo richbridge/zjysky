@@ -59,7 +59,6 @@ function App() {
         </Button>
     );
 
-    const data = Array(5)
         .fill(0)
         .map((v, i) => {
             return {
@@ -83,9 +82,6 @@ function App() {
                     '--kd-c-tabs-card-color-background': 'transparent',
                 }}
             >
-                <div style={{ width: "14em",display: 'flex',justifyContent:'center'}}>
-                    <img src={logo} alt="Logo" />
-                </div>
 
                 <div
                     style={{
@@ -94,10 +90,7 @@ function App() {
 
                     <Tabs
                         type="card"
-                        effect="fade"
-                        defaultActiveKey={'home'}
                     >
-                        <Tabs.TabPane key={'home'} tab={'首页'} />
                         {data.map((v) => (
                             <Tabs.TabPane key={v.value} tab={v.name} />
                         ))}
@@ -113,32 +106,14 @@ function App() {
                     width={'13em'}
                     style={{
                         height: '100%',
-                        backgroundColor: '#343848',
-                        overflow: 'hidden',
-                        flexShrink: 0,
-                        position: 'relative'
                     }}
                 >
-                    <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        overflowY: 'auto',
-                        overflowX: 'hidden'
-                    }}>
                         <Menu
                             theme="dark"
-                            mode="vertical"
                             style={{ width: '100%', border: 'none' }}
                             inlineIndent={24}
                         >
                             <Menu.SubMenu key="sub1" title={"销售管理"} icon={< Settings />}>
-                                <Menu.Item key="1-1">销售看板</Menu.Item>
-                                <Menu.Item key="1-2">销售数据</Menu.Item>
-                                <Menu.Item key="1-3">价格数据</Menu.Item>
-                                <Menu.Item key="1-4">价格采集</Menu.Item>
                             </Menu.SubMenu>
                             <Menu.SubMenu key="sub2" title="培训管理">
                                 <Menu.Item key="2-1">标签二-1</Menu.Item>
@@ -149,7 +124,6 @@ function App() {
                                 <Menu.Item key="3-2">标签二-2</Menu.Item>
                             </Menu.SubMenu>
                         </Menu>
-                    </div>
                 </Sider>
 
                 {/* 右侧区域：页签 + 内容 */}
@@ -159,7 +133,6 @@ function App() {
                     <div style={{ background: '#fff'}}>
                         <Tabs
                             type="line"
-                            effect="fade"
                             showScrollArrow
                             activeKey={activeKey}
                             onChange={onChange}
@@ -171,7 +144,6 @@ function App() {
                                     closable={pane.closable}
                                     closeIcon={removeBtn(pane.value)}
                                 >
-                                    <div style={{ padding: '0 2em', minHeight: '1em' }}>
                                         这里是 {pane.name} 的内容区域
                                     </div>
                                 </Tabs.TabPane>
