@@ -1,0 +1,70 @@
+# ============================================================
+# crawler 模块统一配置（唯一配置入口）
+# 位置：crawler/src/main/resources/application.yml
+#
+# crawler 是纯 Java SE 模块（CrawlerService.main 启动），不走 Spring Boot，
+# 因此由 config/CrawlerConfig 使用 SnakeYAML 读取本文件，按扁平 key 取值。
+#
+# 覆盖优先级：JVM 参数 > 环境变量 > 本文件
+#   -Dcrawler.schedule.time=09:30
+#   CRAWLER_SCHEDULE_TIME=09:30
+#   （环境变量规则：key 转大写，'.' 与 '-' 均替换为 '_'）
+#
+# 四大组件：downloader / processor / scheduler / pipeline
+# Mapper XML：resources/mapper/ShfeMapper.xml（由 config/DbConfig 手工加载）
+# 落库表：md_price_shfe（库中已存在的统一价格宽表，本模块只写入、不建表不删表）
+# ============================================================
+
+spring:
+  application:
+    name: crawler
+  datasource:
+    url: "jdbc:mysql://localhost:3306/zjysky?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true"
+    username: zjysky
+    password: "123456"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: zjysky-crawler-pool
+      maximum-pool-size: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+crawler:
+  db:
+    # 启动时尝试 CREATE DATABASE IF NOT EXISTS（账号无 CREATE 权限会自动跳过，不中断启动）
+    auto-create-database: true
+    mapper-location: mapper/ShfeMapper.xml
+
+  shfe:
+    table: md_price_shfe
+    # %s 会被替换为交易日 yyyyMMdd
+    url-template: "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx%s.dat"
+    default-date: "20251031"
+    sample-size: 5
+    # 金属指数（o_curmetalindex）无品种名，用它作为 symbol 满足唯一键
+    index-symbol: "SHFE金属指数"
+    # o_curinstrument 的"总计"行专用 symbol；o_curproduct 也有"总计"行（symbol=总计），
+    # 两者必须区分，否则会撞 uk_price(task_type, trade_date, symbol) 被 upsert 覆盖
+    total-contract-symbol: "总计-合约"
+
+    # Downloader：把每日原始 JSON 完整落盘（含 o_curinstrument / o_curproduct /
+    # o_curmetalindex 及顶层元数据），文件名取 URL 末尾的 kx{yyyyMMdd}.dat
+    downloader:
+      save-enabled: true
+      save-dir: "data/shfe"
+      skip-existing: true
+
+    site:
+      retry-times: 3
+      sleep-time: 1000
+      time-out: 15000
+      charset: UTF-8
+      user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      referer: "https://www.shfe.com.cn/"
+    spider:
+      thread: 1
+
+  schedule:
+    enabled: true
+    time: "08:00"
+    zone: Asia/Shanghai

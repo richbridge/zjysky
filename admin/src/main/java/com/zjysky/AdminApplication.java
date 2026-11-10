@@ -1,4 +1,4 @@
-package com.zjysky.admin;
+package com.zjysky;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

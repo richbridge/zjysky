@@ -4,26 +4,38 @@
 [class*="menu"] ul,
 [class*="menu"] li {
   list-style: none !important;
-  list-style-type: none !important;
-}
-
-[class*="menu"] ul {
   margin: 0 !important;
   padding-left: 0 !important;
 }
 
-/* ==========================================
-   2. 一级菜单：靠左对齐，去掉默认的内边距
-   ========================================== */
-.kd-menu-item-title,
-.kd-menu-submenu-title {
-  display: flex !important;
-  justify-content: flex-start !important; /* 靠左对齐 */
-  align-items: center !important;
+.bodylayout {
+  height: 100vh;
 }
 
+.header {
+  display: flex;
+  padding: 0 !important;
+  align-items: center;
+  border-bottom: 1px solid #e5e4e7 !important;
+}
 
-/* 图标和文字的间距 */
-.kd-menu-item-icon {
-  margin-right: 0.5em !important;
+/* 1. 修复：确保顶部卡片页签容器正常显示，不要被挤掉 */
+.header .kd-tabs {
+  width: 100%;
+}
+
+.header .kd-tabs-navs-card {
+  border-bottom: none !important;
+}
+
+/* 2. 恢复并定制：选中态（绿色背景 + 白色文字） */
+.header .kd-tab-pane-box-active {
+  background-color: #29C392 !important; /* 替换为你的主题绿 */
+  border-color: transparent !important; /* 去除边框 */
+}
+
+/* 确保选中态文字是白色 */
+.header .kd-tab-pane-box-active .kd-tab-pane-text,
+.header .kd-tab-pane-text-active {
+  color: #ffffff !important;
 }
