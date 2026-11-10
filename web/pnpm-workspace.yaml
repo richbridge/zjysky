@@ -1,0 +1,4 @@
+allowBuilds:
+  '@kdcloudjs/kdesign': true
+  core-js: true
+  core-js-pure: true
