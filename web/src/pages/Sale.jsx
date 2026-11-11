@@ -1,4 +1,4 @@
-// sale.jsx
+// Sale.jsx
 import React from 'react';
 
 const SalePage = () => {

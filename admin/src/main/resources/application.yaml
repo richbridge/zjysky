@@ -1,3 +1,116 @@
 spring:
   application:
     name: admin
+  autoconfigure:
+    # crawler 的 MyBatis-Plus 是纯 Java SE 手工装配（DbConfig），
+    # 不能让 Boot 的 MP 自动配置再建一套 SqlSessionFactory / 扫描 @Mapper。
+    exclude:
+      - com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration
+
+# ============================================================
+# SHFE 爬虫桥接配置（admin → crawler）
+#
+# 注意：crawler jar 内自带 classpath:/application.yml（纯 Java SE 模块用），
+# Spring Boot 也会扫描到它。这里显式声明 spring.application.name 保证 admin 身份，
+# 并在 CrawlerBridgeConfig 中把下面的 crawler.db.* 覆盖注入 crawler 的 CrawlerConfig，
+# 使 admin 与 crawler 用同一个、由 Spring 管理生命周期的连接池。
+# ============================================================
+crawler:
+  db:
+    url: "jdbc:mysql://localhost:3306/zjysky?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true"
+    username: zjysky
+    password: "123456"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    pool-name: zjysky-admin-pool
+    maximum-pool-size: 5
+    connection-timeout: 30000
+    idle-timeout: 600000
+    field-check: true
+
+  # 四源原始响应统一落到 crawler/data 下（绝对路径，避免随工作目录漂移）。
+  # 其它配置项（quote-mode / task-type / 专区清单等）沿用 crawler jar 内 application.yml，
+  # 也可在这里按 crawler.<源>.<key> 覆盖，CrawlerBridgeConfig 会自动透传。
+
+  shfe:
+    save-dir: "D:/code/zjysky/crawler/data/shfe"
+    default-date: "20251031"
+    history-default-date: "20251031"
+    # 当日延时行情 → REALTIME；收盘历史 → QUOTE，收盘后前者会被后者覆盖
+    today-task-type: "REALTIME"
+    history-task-type: "QUOTE"
+    # 定时采历史取「最近一个已收盘交易日」；改成 false 则固定用 history-default-date
+    history-auto-date: true
+
+  sge:
+    save-dir: "D:/code/zjysky/crawler/data/sge"
+    default-date: "2025-11-10"
+    task-type: "QUOTE"
+    history-auto-date: true
+
+    # 需求 4：SGE 当日实时（延时行情页是服务端渲染 HTML，不是 ajax）
+    realtime:
+      url: "https://www.sge.com.cn/sjzx/yshqbg"
+      task-type: "REALTIME"
+      downloader:
+        save-enabled: true
+        save-dir: "D:/code/zjysky/crawler/data/sge-realtime"
+        skip-existing: false
+        binary: false
+        extension: html
+      site:
+        retry-times: 3
+        sleep-time: 1000
+        time-out: 20000
+        charset: UTF-8
+        user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        referer: "https://www.sge.com.cn/"
+
+  cj:
+    save-dir: "D:/code/zjysky/crawler/data/cj"
+    default-start-date: "2025-10-06"
+    default-end-date: "2025-11-06"
+    quote-mode: "latest"
+    include-linked-ids: true
+
+  smm:
+    save-dir: "D:/code/zjysky/crawler/data/smm"
+    default-start-date: "2025-11-19"
+    default-end-date: "2025-11-19"
+    task-type: "NIGHT"
+    mode: "night"
+    quote-mode: "latest"
+    include-linked-ids: true
+
+  # ============================================================
+  # 收盘守卫（与 crawler/application.yml、common/MicaHolidays 同一套配置）
+  # 交易日 + 过了对应收盘时间 → 价格定稿，才采收盘历史；
+  # 交易日 + 未到收盘       → SHFE/SGE 采当日实时；
+  # 周末 / 节假日           → 跳过。
+  # admin 用 mica 官方节假日库判断工作日，比 crawler 的配置兜底更精确。
+  # ============================================================
+  market-close:
+    enabled: true
+    zone: "Asia/Shanghai"
+    # 需求 5：收盘历史落库后删除同日 REALTIME 行（收盘覆盖实时）
+    overwrite-realtime: true
+    realtime-task-type: "REALTIME"
+    close-task-types: "QUOTE,NIGHT"
+    close-times:
+      SHFE: "15:00"
+      SGE: "15:30"
+      CJ: "15:00"
+      SMM: "17:00"
+    # 一般不用填：mica 已内置法定节假日/调休；这里只用于额外补充（yyyy-MM-dd）
+    holidays: ""
+    extra-workdays: ""
+
+  schedule:
+    # admin 里由 Spring @Scheduled 接管定时，不再启动 ShfeScheduler 的自有非守护线程
+    enabled: true
+    cron: "0 0 8 * * *"
+    zone: "Asia/Shanghai"
+    # 新增的四源统一定时任务：默认关闭，避免改代码重启就自动联网采集。
+    # 想每天 08:30 自动采四源，改成 true 即可。
+    multi:
+      enabled: false
+      cron: "0 30 8 * * *"

@@ -68,6 +68,62 @@
             <version>1.18.48</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- ===== SGE 上金所日行情是 .xlsx，必须引入 POI 解析 ===== -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.5.1</version>
+        </dependency>
+
+        <!--
+          POI 5.5.1 需要较新的 commons-io / commons-collections4，
+          但 WebMagic 会传递较老版本。这里显式声明，避免 Maven 依赖仲裁选中旧包
+          导致 NoSuchMethodError: BoundedInputStream.builder()。
+        -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.21.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.18.0</version>
+        </dependency>
+
+        <!--
+          SGE 当日实时页 https://www.sge.com.cn/sjzx/yshqbg 是服务端渲染 HTML，
+          用 jsoup 解析表格最稳。WebMagic 的 xsoup 也传递 jsoup，这里显式固定版本，
+          避免依赖仲裁把 1.16.1 换成老版本 1.8.3。
+        -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.16.1</version>
+        </dependency>
+
+        <!-- 把 POI 使用的 log4j-api 日志桥接到 SLF4J，避免 "no logging provider" 报错 -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.26.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-to-slf4j</artifactId>
+            <version>2.26.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.18</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -29,5 +29,12 @@
             <version>7.1.0-RC2</version>
             <scope>compile</scope>
         </dependency>
+        <!-- MicaHolidays 使用 @Service（在 spring-context 中），spring-beans 不含该注解 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>7.1.0-RC2</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 </project>

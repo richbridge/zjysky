@@ -20,7 +20,7 @@ import java.math.BigDecimal;
  */
 @Data
 @TableName("md_price_shfe")
-public class ShfeDailyData {
+public class MdPriceShfe {
 
     @TableId(type = IdType.AUTO)
     private Long id;                    // 自增主键

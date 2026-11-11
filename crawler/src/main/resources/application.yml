@@ -33,13 +33,35 @@ crawler:
   db:
     # 启动时尝试 CREATE DATABASE IF NOT EXISTS（账号无 CREATE 权限会自动跳过，不中断启动）
     auto-create-database: true
-    mapper-location: mapper/ShfeMapper.xml
+    # 多个 mapper XML 用英文逗号分隔；DbConfig 会逐个手工加载（纯 Java SE，无 Spring 扫描）
+    mapper-locations: "mapper/ShfeMapper.xml,mapper/PriceMapper.xml,mapper/CrawlMetaMapper.xml"
+    # 启动前检查四张价格表 + md_source_product 的字段是否齐全；缺字段直接报错，不静默丢数据
+    field-check: true
 
+  # 采集元信息：字段字典 md_crawl_field + 采集日志 md_crawl_log
+  # 由四个 Pipeline 落库时统一写入（成功/失败都记），写失败绝不影响行情数据。
+  meta:
+    enabled: true
+
+  # ============================================================
+  # SHFE 上期所：历史日行情 + 当日延时行情
+  # ============================================================
   shfe:
     table: md_price_shfe
-    # %s 会被替换为交易日 yyyyMMdd
+    # 历史日行情：%s 替换为交易日 yyyyMMdd，例如 kx20251031.dat
     url-template: "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx%s.dat"
+    history-url-template: "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx%s.dat"
+    # 当日实时行情：?params= 只是防缓存时间戳（服务端忽略其具体值）。
+    # 用户给的 https://www.shfe.com.cn/data/tradedata/future/delaymarket/delaymarket_all.dat?params=1763002691819
+    # 就是本地址带一个防缓存参数；服务端返回格式与不带参数时完全一致。
+    today-url: "https://www.shfe.com.cn/data/tradedata/future/delaymarket/delaymarket_all.dat?params=1763002691819"
+    # 当日实时数据的 task_type：与收盘历史 QUOTE 区分，收盘后被收盘数据覆盖
     default-date: "20251031"
+    history-default-date: "20251031"
+    history-task-type: "QUOTE"
+    today-task-type: "REALTIME"
+    # 定时采历史时取哪一天：true=最近一个已收盘交易日；false=固定用 history-default-date（手动补历史用）
+    history-auto-date: true
     sample-size: 5
     # 金属指数（o_curmetalindex）无品种名，用它作为 symbol 满足唯一键
     index-symbol: "SHFE金属指数"
@@ -47,12 +69,13 @@ crawler:
     # 两者必须区分，否则会撞 uk_price(task_type, trade_date, symbol) 被 upsert 覆盖
     total-contract-symbol: "总计-合约"
 
-    # Downloader：把每日原始 JSON 完整落盘（含 o_curinstrument / o_curproduct /
-    # o_curmetalindex 及顶层元数据），文件名取 URL 末尾的 kx{yyyyMMdd}.dat
+    # Downloader：把原始 .dat 完整落盘（历史含 3 类数据集；当日含 delaymarket 二维数组）
     downloader:
       save-enabled: true
       save-dir: "data/shfe"
       skip-existing: true
+      binary: false
+      extension: dat
 
     site:
       retry-times: 3
@@ -63,6 +86,180 @@ crawler:
       referer: "https://www.shfe.com.cn/"
     spider:
       thread: 1
+
+  # ============================================================
+  # SGE 上金所：每日行情 Excel（GET 下载，必须用二进制模式）
+  # ============================================================
+  sge:
+    table: md_price_sge
+    task-type: "QUOTE"
+    url-template: "https://www.sge.com.cn/portal/marketAutomation/downloadExcelForQuoteDailyNew?start_date=%s&end_date=%s"
+    # 对应你给的 2025-11-10；命令行可传其它日期
+    default-date: "2025-11-10"
+    # 定时采收盘 Excel 时取哪一天：true=最近一个已收盘交易日；false=固定用 default-date
+    history-auto-date: true
+    sample-size: 5
+
+    # 当日实时：延时行情页是服务端渲染 HTML，不是 ajax 接口。
+    # 最新价映射到 close_price（表无 last_price 列），收盘后被 Excel 真收盘价覆盖。
+    realtime:
+      url: "https://www.sge.com.cn/sjzx/yshqbg"
+      task-type: "REALTIME"
+      spider:
+        thread: 1
+      downloader:
+        save-enabled: true
+        save-dir: "data/sge-realtime"
+        # 盘中每隔一段时间就采一次，同名文件覆盖保留最新快照
+        skip-existing: false
+        binary: false
+        extension: html
+      site:
+        retry-times: 3
+        sleep-time: 1000
+        time-out: 20000
+        charset: UTF-8
+        user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        referer: "https://www.sge.com.cn/"
+
+    downloader:
+      save-enabled: true
+      save-dir: "data/sge"
+      skip-existing: true
+      binary: true
+      extension: xlsx
+    site:
+      retry-times: 3
+      sleep-time: 1000
+      time-out: 20000
+      charset: UTF-8
+      user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      referer: "https://www.sge.com.cn/"
+    spider:
+      thread: 1
+
+  # ============================================================
+  # CJ 长江有色：先发现全部合约 id，再逐合约抓现货历史
+  # ============================================================
+  cj:
+    table: md_price_cj
+    base-url: "https://cj.smm.cn"
+    home-url: "https://cj.smm.cn/"
+    history-url-template: "https://cj.smm.cn/ajax/spot/history/%s/%s/%s"
+    default-product-id: "201102250293"
+    default-start-date: "2025-10-06"
+    default-end-date: "2025-11-06"
+    task-type: "QUOTE"
+    # 接口会忽略起止日期、固定返回最近约 30 个交易日：
+    #   latest = 只落响应里最新报价日那批（默认，适合每日/晚上采集）
+    #   all    = 30 个交易日全落（首次补历史用）
+    #   range  = 严格按 start/end 过滤（可能 0 条，因为接口不认这两个参数）
+    quote-mode: "latest"
+    date-filter: false
+    # 同时抓 lme_list / shfe_list 里的关联合约 id，写入 md_source_product（加 LME:/SHFE: 前缀避免撞主键）
+    include-linked-ids: true
+    interval-millis: 400
+    discovery:
+      enabled: true
+      cache-minutes: 10
+    downloader:
+      save-enabled: true
+      save-dir: "data/cj"
+      skip-existing: false
+      binary: false
+      extension: json
+    # 品种发现页是 HTML，默认不另存文件（避免 data 目录塞满首页快照）
+    product:
+      downloader:
+        save-enabled: false
+        save-dir: "data/cj-product"
+        skip-existing: true
+        binary: false
+        extension: html
+    site:
+      retry-times: 3
+      sleep-time: 800
+      time-out: 20000
+      charset: UTF-8
+      user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      referer: "https://cj.smm.cn/"
+    spider:
+      thread: 1
+      discovery-thread: 1
+    sample-size: 5
+
+  # ============================================================
+  # SMM 上海有色网：晚上采集口径，先发现全部合约 id，再逐合约抓
+  # ============================================================
+  smm:
+    table: md_price_smm
+    base-url: "https://hq.smm.cn"
+    history-url-template: "https://hq.smm.cn/ajax/spot/history/%s/%s/%s"
+    default-product-id: "201102250376"
+    default-start-date: "2025-11-19"
+    default-end-date: "2025-11-19"
+    # 晚上采集单独用 NIGHT，避免覆盖白天 QUOTE 口径的数据
+    task-type: "NIGHT"
+    mode: "night"
+    quote-mode: "latest"
+    date-filter: false
+    include-linked-ids: true
+    interval-millis: 800
+    discovery:
+      enabled: true
+      cache-minutes: 10
+    # 25 个专区；可用逗号分隔覆盖。实测去重后约 262 个合约 id。
+    category-slugs: "copper,aluminum,lead,zinc,nickel,tin,magnesium,silicon,titanium,stainless-steel,chromium,manganese,tungsten,precious-metals,rare-earth,antimony,in-ge-ga,bi-se-te,other-minor-metals,metal-scraps,photovoltaic,semiconductor,wirecable,huanan"
+    downloader:
+      save-enabled: true
+      save-dir: "data/smm"
+      skip-existing: false
+      binary: false
+      extension: json
+    product:
+      downloader:
+        save-enabled: false
+        save-dir: "data/smm-product"
+        skip-existing: true
+        binary: false
+        extension: html
+    site:
+      retry-times: 3
+      sleep-time: 1000
+      time-out: 20000
+      charset: UTF-8
+      user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      referer: "https://hq.smm.cn/"
+    spider:
+      thread: 1
+      discovery-thread: 4
+    sample-size: 5
+
+  # ============================================================
+  # 收盘时间守卫：决定「现在该采实时还是该采历史」
+  #
+  # 规则：交易日 + 过了该源收盘时间 → 价格已定稿，才采收盘历史数据；
+  #       交易日 + 还没到收盘       → 只采 SHFE / SGE 当日实时；
+  #       周末 / 节假日             → 跳过。
+  # admin 侧 common/MicaHolidays 读同一套配置，但用 mica 官方节假日库，
+  # 判断比这里的配置兜底更精确；两边方法名和语义一一对应。
+  # ============================================================
+  market-close:
+    enabled: true
+    zone: "Asia/Shanghai"
+    # 需求 5：收盘历史落库成功后，删除同 source + trade_date 的当日 REALTIME 行
+    overwrite-realtime: true
+    realtime-task-type: "REALTIME"
+    # 命中其中任一口径就认为是「收盘定稿」，触发覆盖
+    close-task-types: "QUOTE,NIGHT"
+    close-times:
+      SHFE: "15:00"
+      SGE: "15:30"
+      CJ: "15:00"
+      SMM: "17:00"
+    # crawler 独立运行没有 Spring 节假日库，用配置兜底（yyyy-MM-dd，逗号分隔）
+    holidays: ""
+    extra-workdays: ""
 
   schedule:
     enabled: true

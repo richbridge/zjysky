@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.config.GlobalConfig;
 import com.baomidou.mybatisplus.core.toolkit.GlobalConfigUtils;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import com.zjysky.crawler.mapper.CrawlMetaMapper;
+import com.zjysky.crawler.mapper.PriceMapper;
 import com.zjysky.crawler.mapper.ShfeMapper;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.io.Resources;
@@ -13,28 +15,39 @@ import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 
+import javax.sql.DataSource;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * MyBatis-Plus 装配（crawler 是纯 Java SE 模块，非 Spring Boot，故手工构建 SqlSessionFactory）。
  *
- * <p>所有连接参数均来自 {@code classpath:application.yml}（由 {@link CrawlerConfig} 读取）：</p>
+ * <p>两种运行形态：</p>
  * <ol>
- *   <li>{@code spring.datasource.*} → 建库自检 + HikariCP 连接池</li>
- *   <li>{@code crawler.db.mapper-location} → 注册 Mapper 接口（MP 注入 BaseMapper CRUD）</li>
- *   <li>加载 resources/mapper 下的 XML 中的自定义 SQL（建表 + 批量 upsert）</li>
+ *   <li><b>独立运行</b>（{@code CrawlerService.main}）：按 {@code application.yml} 自建 HikariCP，
+ *       并注册 JVM shutdown hook 负责关闭；</li>
+ *   <li><b>被 admin 引入</b>：启动时先调用 {@link #useDataSource(DataSource)} 注入
+ *       Spring 容器管理的 DataSource，本类不再建池、不再注册 hook，池的生命周期完全交给
+ *       Spring（避免 DevTools 热重启后出现 "HikariDataSource has been closed" 和连接泄漏）。</li>
  * </ol>
+ *
+ * <p>所有连接参数均来自 {@code classpath:application.yml}（由 {@link CrawlerConfig} 读取），
+ * admin 环境下可由 {@link CrawlerConfig#overlay(java.util.Map)} 覆盖。</p>
  */
 public final class DbConfig {
 
     private static final String DS = "spring.datasource.";
 
     private static volatile SqlSessionFactory factory;
-    private static volatile HikariDataSource dataSource;
+    /** 独立运行时自建的连接池 */
+    private static volatile HikariDataSource ownedDataSource;
+    /** admin 注入的、由 Spring 容器管理生命周期的连接池 */
+    private static volatile DataSource externalDataSource;
 
     private DbConfig() {
     }
@@ -50,9 +63,27 @@ public final class DbConfig {
         return factory;
     }
 
-    public static HikariDataSource getDataSource() {
+    /** 当前生效的数据源（独立运行时为自建池，admin 中为 Spring 注入的池） */
+    public static DataSource getDataSource() {
         getSqlSessionFactory();
-        return dataSource;
+        return externalDataSource != null ? externalDataSource : ownedDataSource;
+    }
+
+    /**
+     * 注入外部容器的数据源，必须在首次 {@link #getSqlSessionFactory()} 之前调用。
+     * 典型调用点：admin 模块的 {@code @Bean} 创建 DataSource 时。
+     */
+    public static void useDataSource(DataSource dataSource) {
+        DataSource ds = Objects.requireNonNull(dataSource, "dataSource");
+        synchronized (DbConfig.class) {
+            if (factory != null) {
+                if (externalDataSource == ds) {
+                    return;
+                }
+                throw new IllegalStateException("SqlSessionFactory 已初始化，useDataSource 必须在首次采集前调用");
+            }
+            externalDataSource = ds;
+        }
     }
 
     private static SqlSessionFactory build() {
@@ -60,34 +91,43 @@ public final class DbConfig {
         String user = CrawlerConfig.str(DS + "username", "richfan");
         String pwd = CrawlerConfig.str(DS + "password", "");
         String driver = CrawlerConfig.str(DS + "driver-class-name", "com.mysql.cj.jdbc.Driver");
-        String mapperXml = CrawlerConfig.str("crawler.db.mapper-location", "mapper/ShfeMapper.xml");
+        // 优先读 mapper-locations（逗号分隔）；保留 mapper-location 作为旧配置兼容
+        List<String> mapperXmls = CrawlerConfig.list("crawler.db.mapper-locations",
+                List.of(CrawlerConfig.str("crawler.db.mapper-location", "mapper/ShfeMapper.xml")));
 
-        if (CrawlerConfig.boolVal("crawler.db.auto-create-database", true)) {
-            ensureDatabase(url, user, pwd, driver);
+        DataSource ds = externalDataSource;
+        boolean managedBySpring = ds != null;
+        if (!managedBySpring) {
+            if (CrawlerConfig.boolVal("crawler.db.auto-create-database", true)) {
+                ensureDatabase(url, user, pwd, driver);
+            }
+            HikariConfig hc = new HikariConfig();
+            hc.setJdbcUrl(url);
+            hc.setUsername(user);
+            hc.setPassword(pwd);
+            hc.setDriverClassName(driver);
+            hc.setPoolName(CrawlerConfig.str(DS + "hikari.pool-name", "zjysky-crawler-pool"));
+            hc.setMaximumPoolSize(CrawlerConfig.intVal(DS + "hikari.maximum-pool-size", 5));
+            hc.setConnectionTimeout(CrawlerConfig.longVal(DS + "hikari.connection-timeout", 30000L));
+            hc.setIdleTimeout(CrawlerConfig.longVal(DS + "hikari.idle-timeout", 600000L));
+            HikariDataSource hikari = new HikariDataSource(hc);
+            ownedDataSource = hikari;
+            ds = hikari;
+            Runtime.getRuntime().addShutdownHook(new Thread(DbConfig::close));
         }
 
-        HikariConfig hc = new HikariConfig();
-        hc.setJdbcUrl(url);
-        hc.setUsername(user);
-        hc.setPassword(pwd);
-        hc.setDriverClassName(driver);
-        hc.setPoolName(CrawlerConfig.str(DS + "hikari.pool-name", "zjysky-crawler-pool"));
-        hc.setMaximumPoolSize(CrawlerConfig.intVal(DS + "hikari.maximum-pool-size", 5));
-        hc.setConnectionTimeout(CrawlerConfig.longVal(DS + "hikari.connection-timeout", 30000L));
-        hc.setIdleTimeout(CrawlerConfig.longVal(DS + "hikari.idle-timeout", 600000L));
-        dataSource = new HikariDataSource(hc);
-        Runtime.getRuntime().addShutdownHook(new Thread(DbConfig::close));
-
-        try (Connection c = dataSource.getConnection()) {
+        DataSource effective = ds;
+        try (Connection c = effective.getConnection()) {
             System.out.println(">>> [DB] 已连接: " + c.getCatalog()
-                    + "（配置来自 " + CrawlerConfig.FILE + "）");
+                    + "（" + (managedBySpring ? "Spring 容器注入的 DataSource" : "自建连接池")
+                    + "，配置来自 " + CrawlerConfig.FILE + " / overlay）");
         } catch (SQLException e) {
             throw new IllegalStateException("连接数据库失败，请确认 " + CrawlerConfig.FILE
                     + " 中的 url/账号正确且库已创建：" + e.getMessage(), e);
         }
 
         String envId = CrawlerConfig.str("spring.application.name", "crawler");
-        Environment env = new Environment(envId, new JdbcTransactionFactory(), dataSource);
+        Environment env = new Environment(envId, new JdbcTransactionFactory(), effective);
         MybatisConfiguration configuration = new MybatisConfiguration(env);
 
         GlobalConfig gc = GlobalConfigUtils.defaults();
@@ -96,10 +136,14 @@ public final class DbConfig {
         configuration.setMapUnderscoreToCamelCase(true);
 
         configuration.addMapper(ShfeMapper.class);
-        loadMapperXml(configuration, mapperXml);
+        configuration.addMapper(PriceMapper.class);
+        configuration.addMapper(CrawlMetaMapper.class);
+        for (String mapperXml : mapperXmls) {
+            loadMapperXml(configuration, mapperXml);
+        }
 
         SqlSessionFactory f = new MybatisSqlSessionFactoryBuilder().build(configuration);
-        System.out.println(">>> [DB] MyBatis-Plus 就绪，mapper=" + mapperXml);
+        System.out.println(">>> [DB] MyBatis-Plus 就绪，mapper=" + mapperXmls);
         return f;
     }
 
@@ -170,9 +214,19 @@ public final class DbConfig {
         }
     }
 
+    /**
+     * 释放本类持有的静态引用；只关闭「自建」连接池，
+     * 外部注入的 DataSource 由 Spring 容器负责关闭。
+     */
     public static void close() {
-        if (dataSource != null && !dataSource.isClosed()) {
-            dataSource.close();
+        synchronized (DbConfig.class) {
+            HikariDataSource own = ownedDataSource;
+            if (own != null && !own.isClosed()) {
+                own.close();
+            }
+            ownedDataSource = null;
+            externalDataSource = null;
+            factory = null;
         }
     }
 }
