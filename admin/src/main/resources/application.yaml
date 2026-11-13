@@ -2,10 +2,6 @@ spring:
   application:
     name: admin
   autoconfigure:
-    # crawler 的 MyBatis-Plus 是纯 Java SE 手工装配（DbConfig），
-    # 不能让 Boot 的 MP 自动配置再建一套 SqlSessionFactory / 扫描 @Mapper。
-    exclude:
-      - com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration
 
 # ============================================================
 # SHFE 爬虫桥接配置（admin → crawler）
@@ -105,7 +101,8 @@ crawler:
     extra-workdays: ""
 
   schedule:
-    # admin 里由 Spring @Scheduled 接管定时，不再启动 ShfeScheduler 的自有非守护线程
+    # admin 里由 Spring @Scheduled 接管定时（com.zjysky.schedule.CrawlSchedules），
+    # 不启动 crawler 侧 SourceSchedule 的自有非守护线程
     enabled: true
     cron: "0 0 8 * * *"
     zone: "Asia/Shanghai"

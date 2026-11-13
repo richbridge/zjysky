@@ -3,8 +3,9 @@ package com.zjysky.crawler.processor;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.zjysky.crawler.config.CrawlerConfig;
-import com.zjysky.crawler.model.MdPriceShfe;
+import com.zjysky.crawler.CrawlerConfig;
+import com.zjysky.crawler.PriceSupport;
+import com.zjysky.common.database.entity.MdPriceShfe;
 import us.codecraft.webmagic.Page;
 import us.codecraft.webmagic.Site;
 import us.codecraft.webmagic.processor.PageProcessor;
@@ -124,7 +125,7 @@ public class ShfeProcessor implements PageProcessor {
 
                 MdPriceShfe d = new MdPriceShfe();
                 d.setTaskType(taskType);
-                d.setTradeDate(tradeDate);
+                d.setTradeDate(PriceSupport.localDate(tradeDate));
                 d.setRowType("CONTRACT");
                 d.setSymbol(symbol);
                 d.setProductName(instrumentId);
@@ -295,7 +296,7 @@ public class ShfeProcessor implements PageProcessor {
                                     String rowType, String symbol, JSONObject item) {
         MdPriceShfe d = new MdPriceShfe();
         d.setTaskType(taskType);       // 表 NOT NULL，无默认值
-        d.setTradeDate(tradeDate);
+        d.setTradeDate(PriceSupport.localDate(tradeDate));
         d.setRowType(rowType);
         d.setSymbol(symbol);           // 表 NOT NULL，无默认值，唯一键之一
         d.setSourceUpdateTime(updateTime);

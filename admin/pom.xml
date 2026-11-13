@@ -57,45 +57,20 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.zjysky</groupId>
-            <artifactId>common</artifactId>
-            <version>1.0-SNAPSHOT</version>
-            <scope>compile</scope>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+            <version>3.5.18</version>
         </dependency>
 
-        <!-- 四源爬虫（SHFE / SGE / CJ / SMM）：四大组件 + MyBatis-Plus Mapper（纯 Java SE 模块，由 CrawlerBridgeConfig 接管数据源） -->
         <dependency>
             <groupId>com.zjysky</groupId>
             <artifactId>crawler</artifactId>
-            <version>1.0-SNAPSHOT</version>
-            <exclusions>
-                <!-- WebMagic 传递的老 SLF4J 绑定会与 Spring Boot 的 Logback 冲突 -->
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <!-- WebMagic / POI 传递的老版本 commons 组件在 JDK 27 下会 NoSuchMethodError，显式固定 -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.18.0</version>
+            <version>1.0-SNAPSHOT</version> <!-- 你的版本号 -->
         </dependency>
         <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.21.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-collections4</artifactId>
-            <version>4.5.0</version>
+            <groupId>com.zjysky</groupId>
+            <artifactId>common</artifactId> <!-- 填你common模块的artifactId -->
+            <version>1.0-SNAPSHOT</version> <!-- 或者写死具体版本，如 1.0.0-SNAPSHOT -->
         </dependency>
     </dependencies>
 
@@ -120,6 +95,7 @@
                                 <path>
                                     <groupId>org.projectlombok</groupId>
                                     <artifactId>lombok</artifactId>
+                                    <version>1.18.48</version>
                                 </path>
                             </annotationProcessorPaths>
                         </configuration>
@@ -135,11 +111,23 @@
                                 <path>
                                     <groupId>org.projectlombok</groupId>
                                     <artifactId>lombok</artifactId>
+                                    <version>1.18.48</version>
                                 </path>
                             </annotationProcessorPaths>
                         </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+            <!-- 新 parent（4.2.0-SNAPSHOT）默认 surefire 3.6.1 本地未缓存，离线打包会失败；
+                 固定为本地已有的 3.6.0 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.6.0</version>
             </plugin>
         </plugins>
     </build>

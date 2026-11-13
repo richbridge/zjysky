@@ -1,70 +1,59 @@
 package com.zjysky.crawler;
 
-import com.zjysky.crawler.config.CrawlerConfig;
-import com.zjysky.crawler.scheduler.CjScheduler;
-import com.zjysky.crawler.scheduler.SgeScheduler;
-import com.zjysky.crawler.scheduler.ShfeScheduler;
-import com.zjysky.crawler.scheduler.SmmScheduler;
-import com.zjysky.crawler.scheduler.TimedSourceScheduler;
 import com.zjysky.crawler.spider.CjSpider;
 import com.zjysky.crawler.spider.SgeSpider;
 import com.zjysky.crawler.spider.ShfeSpider;
 import com.zjysky.crawler.spider.SmmSpider;
-import com.zjysky.crawler.support.CloseTimeGuard;
-import com.zjysky.crawler.support.SpiderRegistry;
+import com.zjysky.crawler.spider.AbstractSpotSpider;
+import com.zjysky.crawler.spider.SpiderRegistry;
+import com.zjysky.crawler.scheduler.AbstractSourceScheduler;
+import com.zjysky.crawler.guard.CloseTimeGuard;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
 /**
  * 统一启动入口。配置统一在 {@code crawler/src/main/resources/application.yml}。
  *
- * <p>项目结构（按职责分文件夹，一个文件夹只做一类事）：</p>
+ * <p><b>模块结构</b>：WebMagic 四大组件 + Spider + 守卫，一共六个包；
+ * 每个组件目录按数据源拆成四个类（Sge/Shfe/Smm/Cj 前缀）+ 一个共用基类；
+ * 根目录只有本入口、全局配置 {@link CrawlerConfig}、共用工具 {@link PriceSupport}、
+ * 数据库装配 {@link DbConfig} 和现货源差异表 {@link SpotSource}。
+ * 数据库实体与 Mapper 全部来自 common 模块，crawler 不自己定义持久层。</p>
  * <pre>
  * crawler/src/main/java/com/zjysky/crawler/
- *   ├── config/      读配置、连数据库
- *   ├── model/       四张价格表 + 品种字典对应的 Java 类（Lombok）
- *   ├── mapper/      MyBatis-Plus Mapper 接口
- *   ├── support/     数字/日期/表结构/关联合约等共用小工具
- *   ├── spider/      ★ 总指挥：把下面四个组件组装起来并启动
- *   ├── downloader/  ① 下载 JSON / Excel / HTML（原始响应落盘）
- *   ├── processor/   ② 解析内容（JSON / Excel / HTML → Java 对象）
- *   ├── scheduler/   ③ 管理待抓 URL 队列 / 独立运行时定时触发
- *   └── pipeline/    ④ 字段自检 + 幂等写库
+ *   ├── downloader/  ① Downloader    AbstractSourceDownloader + Sge/Shfe/Smm/CjDownloader
+ *   ├── processor/   ② PageProcessor AbstractSpotProcessor + Sge/Shfe/Smm/CjProcessor
+ *   ├── scheduler/   ③ Scheduler     AbstractSourceScheduler + Sge/Shfe/Smm/CjScheduler
+ *   │                                （URL 队列去重用 WebMagic 自带 QueueScheduler）
+ *   ├── pipeline/    ④ Pipeline      AbstractPricePipeline + AbstractSpotPipeline
+ *   │                                + Sge/Shfe/Smm/CjPipeline + CrawlMetaSupport
+ *   ├── spider/      ★ Spider        AbstractSpotSpider + Cj/SmmSpider + Sge/ShfeSpider
+ *   │                                + SpiderRegistry
+ *   └── guard/       ★ 守卫          交易日/收盘判断（工作日取自 common.MicaHolidays）
+ *                                    + 当天不重复采 + 收盘数据定稿判定
  * </pre>
  *
- * <p><b>常用命令</b>（source 取 SHFE / SGE / CJ / SMM，大小写不敏感）：</p>
+ * <p><b>触发时间</b>：SHFE / SGE 由 {@code crawler.schedule.times.<源>} 配置；
+ * CJ / SMM 按「开盘后 30 分钟内一次、收盘后一次」自动推算
+ * （{@code crawler.<源>.schedule.open-time / open-delay-minutes / close-delay-minutes}
+ * + {@code crawler.market-close.close-times.<源>}），全部可配置。</p>
+ *
+ * <p><b>常用命令</b>（source 取 SHFE / SGE / CJ / SMM，大小写不敏感；
+ * 以下命令均可加 nohup 长驻运行，参数为 HH:mm 时按该时刻定时）：</p>
  * <pre>
- * config                                  打印生效配置（密码打码）
- * market-status                           打印四源收盘时间 / 当前该采实时还是历史
- *
- * once SHFE                               按收盘守卫决定：盘中采实时、收盘后采历史
- * once SHFE realtime                      强制只采当日实时（task_type=REALTIME）
- * once SHFE history 20251031              只采历史日行情 kx20251031.dat
- * once SHFE scheduled                     走一次收盘守卫（和定时任务同样逻辑）
- * once SHFE &lt;完整URL&gt;                    自动识别历史 / 当日
- *
- * once SGE realtime                       采当日延时行情 HTML（task_type=REALTIME）
- * once SGE 2025-11-10                     采上金所指定日收盘 Excel（QUOTE）
- * once SGE prev                           采上一工作日（仅跳过周末）
- * once SGE scheduled                      走一次收盘守卫
- *
- * once CJ                                 发现全部 CJ 合约并逐个采集
- * once CJ all 2025-10-06 2025-11-06       同上，显式指定日期参数
- * once CJ one 201102250293                只采一个合约（调试用）
- * once SMM                                晚上采集：发现全部 SMM 合约并逐个采集
- * once SMM one 201102250376               只采一个 SMM 合约（调试用）
- * once CJ|SMM scheduled                   走一次收盘守卫（未到收盘不采）
- *
+ * config / market-status                  生效配置 / 四源收盘状态
+ * once SHFE [realtime|history 20251031|scheduled|&lt;URL&gt;]
+ * once SGE [realtime|2025-11-10|prev|scheduled]
+ * once CJ|SMM [all [起] [止] | one 合约 [起] [止] | scheduled | &lt;URL&gt;]
  * products CJ|SMM                         只做品种发现，写 md_source_product
- * download SHFE|SGE realtime              只下载当日实时原始响应落盘
  * download SHFE|SGE|CJ|SMM [...]          只下载原始响应落盘，不入库
- *
- * 09:30                                   独立运行时覆盖定时时刻（默认取 yml）
  * </pre>
  *
- * <p>在 admin 模块里不会调用本类的 {@code main}；Spring 通过
- * {@code CrawlerTaskService} 调用各 {@code *Spider.run*()} 静态方法。</p>
+ * <p>在 admin 模块里不会调用本类的 {@code main}；采集由前端页面 / REST 接口
+ * 按需触发，执行时落到各 Spider 的采集方法上。</p>
  */
 public class CrawlerService {
 
@@ -79,6 +68,10 @@ public class CrawlerService {
         }
         if ("market-status".equalsIgnoreCase(mode)) {
             CloseTimeGuard.printAllStatus();
+            return;
+        }
+        if ("schedule".equalsIgnoreCase(mode)) {
+            printSchedule();
             return;
         }
         if ("products".equalsIgnoreCase(mode)) {
@@ -98,14 +91,31 @@ public class CrawlerService {
             return;
         }
         if (mode.matches("\\d{1,2}:\\d{2}")) {
-            startScheduler(mode);
+            startSchedules(mode);
             return;
         }
         if (mode.isBlank() && !CrawlerConfig.boolVal("crawler.schedule.enabled", true)) {
             runAllScheduledOnce();
             return;
         }
-        startScheduler(mode);
+        startSchedules(mode);
+    }
+
+
+    /** 自检：打印四源的每日触发时刻（schedule 命令）。 */
+    private static void printSchedule() {
+        System.out.println("=== 四源每日触发时刻 ===");
+        for (AbstractSourceScheduler s : AbstractSourceScheduler.all()) {
+            List<Integer> list = new ArrayList<>(s.triggerTimes());
+            Collections.sort(list);
+            StringBuilder sb = new StringBuilder("  " + s.source() + " -> ");
+            for (int m : list) {
+                sb.append(AbstractSourceScheduler.format(m)).append("  ");
+            }
+            System.out.println(sb);
+        }
+        System.out.println("  提示: SHFE/SGE 用 crawler.schedule.times.<源>；"
+                + "CJ/SMM 用 crawler.<源>.schedule.open-time / open-delay-minutes / close-delay-minutes");
     }
 
     // ================================================================
@@ -120,7 +130,7 @@ public class CrawlerService {
             if (arg != null && arg.startsWith("http")) {
                 ShfeSpider.runOnce(arg);
             } else if (arg == null || arg.isBlank()) {
-                ShfeSpider.runScheduled();
+                AbstractSourceScheduler.of("SHFE").runOnce();
             } else {
                 ShfeSpider.runHistory(arg);
             }
@@ -132,8 +142,8 @@ public class CrawlerService {
         switch (source) {
             case "SHFE" -> onceShfe(rest);
             case "SGE" -> onceSge(rest);
-            case "CJ" -> onceCj(rest);
-            case "SMM" -> onceSmm(rest);
+            case "CJ" -> onceSpot(CjSpider.of("CJ"), rest);
+            case "SMM" -> onceSpot(SmmSpider.of("SMM"), rest);
             default -> throw new IllegalArgumentException(
                     "未知数据源 " + args[1] + "，可用 SHFE / SGE / CJ / SMM");
         }
@@ -141,7 +151,7 @@ public class CrawlerService {
 
     private static void onceShfe(String[] a) {
         if (a.length == 0 || "all".equalsIgnoreCase(a[0]) || "scheduled".equalsIgnoreCase(a[0])) {
-            ShfeSpider.runScheduled();
+            AbstractSourceScheduler.of("SHFE").runOnce();
         } else if ("today".equalsIgnoreCase(a[0]) || "delay".equalsIgnoreCase(a[0])
                 || "realtime".equalsIgnoreCase(a[0])) {
             ShfeSpider.runRealtime();
@@ -156,7 +166,7 @@ public class CrawlerService {
 
     private static void onceSge(String[] a) {
         if (a.length == 0 || "scheduled".equalsIgnoreCase(a[0])) {
-            SgeSpider.runScheduled();
+            AbstractSourceScheduler.of("SGE").runOnce();
         } else if ("realtime".equalsIgnoreCase(a[0])) {
             SgeSpider.runRealtime();
         } else if ("prev".equalsIgnoreCase(a[0])) {
@@ -168,37 +178,19 @@ public class CrawlerService {
         }
     }
 
-    private static void onceCj(String[] a) {
-        if (a.length == 0 || "all".equalsIgnoreCase(a[0])) {
-            String from = a.length > 1 ? a[1] : null;
-            String to = a.length > 2 ? a[2] : null;
-            CjSpider.runAll(from, to);
+    /** 现货源（CJ / SMM）的 once 命令：两个源参数习惯一致，逻辑只有一份。 */
+    private static void onceSpot(AbstractSpotSpider spot, String[] a) {
+        if (a.length == 0 || "all".equalsIgnoreCase(a[0]) || "night".equalsIgnoreCase(a[0])) {
+            spot.runAll(a.length > 1 ? a[1] : null, a.length > 2 ? a[2] : null);
         } else if ("scheduled".equalsIgnoreCase(a[0])) {
-            CjSpider.runScheduled();
+            AbstractSourceScheduler.of(spot.name()).runOnce();
         } else if ("one".equalsIgnoreCase(a[0])) {
-            CjSpider.runOne(a.length > 1 ? a[1] : null,
+            spot.runOne(a.length > 1 ? a[1] : null,
                     a.length > 2 ? a[2] : null, a.length > 3 ? a[3] : null);
         } else if (a[0].startsWith("http")) {
-            CjSpider.runUrl(a[0]);
+            spot.runUrl(a[0]);
         } else {
-            CjSpider.runOne(a[0], a.length > 1 ? a[1] : null, a.length > 2 ? a[2] : null);
-        }
-    }
-
-    private static void onceSmm(String[] a) {
-        if (a.length == 0 || "night".equalsIgnoreCase(a[0]) || "all".equalsIgnoreCase(a[0])) {
-            String from = a.length > 1 ? a[1] : null;
-            String to = a.length > 2 ? a[2] : null;
-            SmmSpider.runAll(from, to);
-        } else if ("scheduled".equalsIgnoreCase(a[0])) {
-            SmmSpider.runScheduled();
-        } else if ("one".equalsIgnoreCase(a[0])) {
-            SmmSpider.runOne(a.length > 1 ? a[1] : null,
-                    a.length > 2 ? a[2] : null, a.length > 3 ? a[3] : null);
-        } else if (a[0].startsWith("http")) {
-            SmmSpider.runUrl(a[0]);
-        } else {
-            SmmSpider.runOne(a[0], a.length > 1 ? a[1] : null, a.length > 2 ? a[2] : null);
+            spot.runOne(a[0], a.length > 1 ? a[1] : null, a.length > 2 ? a[2] : null);
         }
     }
 
@@ -229,9 +221,11 @@ public class CrawlerService {
                     SgeSpider.downloadDate(a.length > 0 ? a[0] : null);
                 }
             }
-            case "CJ" -> CjSpider.downloadOne(a.length > 0 ? a[0] : null,
+            case "CJ" -> CjSpider.of("CJ").downloadOne(
+                    a.length > 0 ? a[0] : null,
                     a.length > 1 ? a[1] : null, a.length > 2 ? a[2] : null);
-            case "SMM" -> SmmSpider.downloadOne(a.length > 0 ? a[0] : null,
+            case "SMM" -> SmmSpider.of("SMM").downloadOne(
+                    a.length > 0 ? a[0] : null,
                     a.length > 1 ? a[1] : null, a.length > 2 ? a[2] : null);
             default -> throw new IllegalArgumentException(
                     "未知数据源 " + args[1] + "，可用 SHFE / SGE / CJ / SMM");
@@ -244,51 +238,44 @@ public class CrawlerService {
         }
         String source = raw.toUpperCase(Locale.ROOT);
         switch (source) {
-            case "CJ" -> CjSpider.discoverProducts().forEach(p ->
+            case "CJ" -> CjSpider.of("CJ").discoverProducts().forEach(p ->
                     System.out.println("  " + p.getProductId() + " | "
                             + p.getProductName() + " | " + p.getProductGroup()));
-            case "SMM" -> SmmSpider.discoverProducts().forEach(p ->
+            case "SMM" -> SmmSpider.of("SMM").discoverProducts().forEach(p ->
                     System.out.println("  " + p.getProductId() + " | "
                             + p.getProductName() + " | " + p.getProductGroup()));
             default -> throw new IllegalArgumentException("products 只支持 CJ / SMM");
         }
     }
 
-    /** 四个源各跑一次 runScheduled()，由各自的 CloseTimeGuard 决定采什么。 */
+    /** 四个源各跑一次定时决策（盘中采实时、收盘后采收盘、非交易日跳过）。 */
     private static void runAllScheduledOnce() {
-        ShfeSpider.runScheduled();
-        SgeSpider.runScheduled();
-        CjSpider.runScheduled();
-        SmmSpider.runScheduled();
+        AbstractSourceScheduler.all().forEach(AbstractSourceScheduler::runOnce);
     }
 
     /**
-     * 独立运行时启动四源的 Scheduler。
+     * 独立运行时启动四源的定时任务。
      *
-     * <p>四个 scheduler 文件夹下的类在这里全部用上，每个都只负责
-     * 「每天几点触发一次 + 到点调哪个 Spider」；真正的采集范围由
-     * 各 Spider 的 runScheduled() 按收盘时间决定。</p>
+     * <p>每个源一个 {@link AbstractSourceScheduler}：它自己解析触发时间、自己决定
+     * 到点采什么，本类只负责统一启动、统一挂停机钩子。</p>
      *
-     * <p>admin 里不会走这里：Spring 的 {@code @Scheduled} 接管定时，
+     * <p>admin 里不会走这里：采集由 /api/crawl/run 按需触发，
      * 不会留下非守护线程写已关闭的连接池。</p>
      */
-    private static void startScheduler(String time) {
-        List<TimedSourceScheduler> schedulers = List.of(
-                new ShfeScheduler(),
-                new SgeScheduler(),
-                new CjScheduler(),
-                new SmmScheduler());
-        for (TimedSourceScheduler scheduler : schedulers) {
-            if (time != null && time.matches("\\d{1,2}:\\d{2}")) {
-                String[] hm = time.split(":");
-                scheduler.startScheduled(Integer.parseInt(hm[0]), Integer.parseInt(hm[1]));
+    private static void startSchedules(String time) {
+        boolean override = time != null && time.matches("\\d{1,2}:\\d{2}");
+        int minutesOfDay = override ? AbstractSourceScheduler.minutesOf(time) : 0;
+
+        for (AbstractSourceScheduler schedule : AbstractSourceScheduler.all()) {
+            if (override) {
+                schedule.startAt(minutesOfDay / 60, minutesOfDay % 60);
             } else {
-                scheduler.startScheduled();
+                schedule.start();
             }
         }
         Runtime.getRuntime().addShutdownHook(
-                new Thread(() -> schedulers.forEach(TimedSourceScheduler::stop),
-                        "crawler-schedulers-stop"));
+                new Thread(() -> AbstractSourceScheduler.all().forEach(AbstractSourceScheduler::stop),
+                        "crawler-schedules-stop"));
         try {
             Thread.currentThread().join();
         } catch (InterruptedException e) {

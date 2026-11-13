@@ -1,22 +1,24 @@
 package com.zjysky.crawler.downloader;
 
 /**
- * SHFE 专用 Downloader：只负责指定配置前缀是 {@code crawler.shfe.downloader.}。
+ * SHFE 上期所的 Downloader（历史 .dat / 当日延时 .dat），配置前缀 crawler.shfe.downloader.。
  *
- * <p>真正的下载与落盘逻辑已经抽到 {@link RawDownloader}，这里只保留一个薄薄的壳，
- * 让 {@code ShfeSpider.create()} 的装配语句仍然一眼就能看懂：
- * {@code .setDownloader(ShfeDownloader.create())}。</p>
- *
- * <p>SHFE 的 .dat 是文本 JSON（不是 Excel），所以
- * {@code crawler.shfe.downloader.binary=false}、{@code extension=dat}，
- * 文件名会保留 URL 末尾的 {@code kx20251031.dat} / {@code delaymarket_all.dat}。</p>
+ * <p>共享逻辑全部在 {@link AbstractSourceDownloader}（下载、Accept 头、
+ * 原始响应落盘、文件命名），本类只负责绑定自己的配置前缀。</p>
  */
-public class ShfeDownloader extends RawDownloader {
+public class ShfeDownloader extends AbstractSourceDownloader {
 
-    private ShfeDownloader() {
+    /** 常规采集：crawler.shfe.downloader.*。 */
+    public ShfeDownloader() {
         super("shfe");
     }
 
+    /** 子配置采集：crawler.{subKey}.downloader.*。 */
+    public ShfeDownloader(String subKey) {
+        super(subKey);
+    }
+
+    /** 常规采集实例。 */
     public static ShfeDownloader create() {
         return new ShfeDownloader();
     }

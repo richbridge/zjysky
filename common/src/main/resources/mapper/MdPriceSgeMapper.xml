@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.zjysky.common.database.mapper.MdPriceSgeMapper">
+
+    <!-- md_price_sge：唯一键 (task_type, trade_date, contract) -->
+    <insert id="upsertBatch">
+        INSERT INTO md_price_sge
+        (task_type, trade_date, contract, seq_no,
+         open_price, high_price, low_price, close_price, settle_price, avg_price,
+         change_value, change_pct, volume, open_interest,
+         delivery_direction, delivery_volume, turnover, raw_json)
+        VALUES
+        <foreach collection="list" item="it" separator=",">
+            (#{it.taskType}, #{it.tradeDate}, #{it.contract}, #{it.seqNo},
+             #{it.openPrice}, #{it.highPrice}, #{it.lowPrice}, #{it.closePrice},
+             #{it.settlePrice}, #{it.avgPrice},
+             #{it.changeValue}, #{it.changePct}, #{it.volume}, #{it.openInterest},
+             #{it.deliveryDirection}, #{it.deliveryVolume}, #{it.turnover}, #{it.rawJson})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            seq_no             = VALUES(seq_no),
+            open_price         = VALUES(open_price),
+            high_price         = VALUES(high_price),
+            low_price          = VALUES(low_price),
+            close_price        = VALUES(close_price),
+            settle_price       = VALUES(settle_price),
+            avg_price          = VALUES(avg_price),
+            change_value       = VALUES(change_value),
+            change_pct         = VALUES(change_pct),
+            volume             = VALUES(volume),
+            open_interest      = VALUES(open_interest),
+            delivery_direction = VALUES(delivery_direction),
+            delivery_volume    = VALUES(delivery_volume),
+            turnover           = VALUES(turnover),
+            raw_json           = VALUES(raw_json),
+            update_time        = CURRENT_TIMESTAMP
+    </insert>
+
+    <!-- 收盘定稿后删除同日 REALTIME 行 -->
+    <delete id="deleteRealtimeByDate">
+        DELETE FROM md_price_sge
+        WHERE task_type  = #{realtimeTaskType}
+          AND trade_date = #{tradeDate}
+    </delete>
+
+</mapper>

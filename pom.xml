@@ -11,6 +11,7 @@
     <modules>
         <module>crawler</module>
         <module>common</module>
+        <module>admin</module>
     </modules>
 
 

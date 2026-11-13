@@ -1,5 +1,5 @@
 /* ==========================================
-   1. 去除所有列表样式（保持你之前的去黑点逻辑）
+   1. 列表样式复位
    ========================================== */
 [class*="menu"] ul,
 [class*="menu"] li {
@@ -8,18 +8,98 @@
   padding-left: 0 !important;
 }
 
+/* ==========================================
+   2. 布局骨架
+   -------------------------------------------------
+   App.jsx 只挂 className，尺寸与排布都在这里调。
+
+   为什么用组合选择器（如 .header.kd-layout-header）：
+   kdesign.css 在 App.css 之后加载，单类选择器会被它的 .kd-xxx 同优先级覆盖。
+   组合两个类把优先级提到 0-2-0，我们的规则稳定胜出，不必滥用 !important。
+   ========================================== */
 .bodylayout {
   height: 100vh;
 }
 
-.header {
+.main-layout.kd-layout {
+  flex: 1;
+  min-height: 0;
+}
+
+.menu-sider.kd-layout-sider {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.side-menu.kd-menu {
+  width: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: none;
+}
+
+.content-layout.kd-layout {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* 页签栏下方那片底色（灰条底色也由它透出），想换色改这里 */
+  background: #ffffff !important;
+}
+
+.content-area.kd-layout-content {
+  flex: 1;
+  padding: 0.5em;
+  overflow-y: auto;
+  background: #f0f2f5;
+}
+
+.content-card {
+  background: #fff;
+  min-height: 100%;
+  padding: 0.5em;
+  border-radius: 0.3em;
+}
+
+/* ==========================================
+   3. 顶部 Header
+   ========================================== */
+.header.kd-layout-header {
+  height: 4em;
   display: flex;
   padding: 0 !important;
   align-items: center;
+  background: #fff;
   border-bottom: 1px solid #e5e4e7 !important;
+  --kd-c-tabs-card-color-background: transparent;
 }
 
-/* 1. 修复：确保顶部卡片页签容器正常显示，不要被挤掉 */
+.header-logo {
+  width: 13em;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.header-logo img {
+  height: 2.5em;
+  width: auto;
+}
+
+.header-tabs {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* 顶部卡片页签容器不被挤掉 */
 .header .kd-tabs {
   width: 100%;
 }
@@ -28,14 +108,161 @@
   border-bottom: none !important;
 }
 
-/* 2. 恢复并定制：选中态（绿色背景 + 白色文字） */
+/* 选中态：绿底白字 */
 .header .kd-tab-pane-box-active {
-  background-color: #29C392 !important; /* 替换为你的主题绿 */
-  border-color: transparent !important; /* 去除边框 */
+  background-color: #29C392 !important;
+  border-color: transparent !important;
 }
 
-/* 确保选中态文字是白色 */
 .header .kd-tab-pane-box-active .kd-tab-pane-text,
 .header .kd-tab-pane-text-active {
   color: #ffffff !important;
+}
+
+/* ==========================================
+   4. 页签栏下方那条灰条
+   -------------------------------------------------
+   DOM：
+   .custom-tabs-container > .kd-tabs
+     ├─ .kd-tabs-navs        ← 页签导航（首页 / 销售管理…）
+     └─ .kd-carousel-root    ← kdesign Tabs 自带的内容容器，把 tab 节点重复渲染了一遍
+
+   ① 灰条底色由外层 .content-layout 的 background 透出（见第 2 节）
+   ② 中间的“首页”文字来自上面的 .kd-carousel-root
+   ========================================== */
+.custom-tabs-container .kd-carousel-root {
+  background: transparent;
+}
+
+/* ==========================================
+   5. 导航链接（React Router <NavLink> / <Link>）
+   -------------------------------------------------
+   <a> 需要去掉下划线、继承父级文字色，并铺满可点击区域
+   ========================================== */
+.menu-nav-link {
+  display: block;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+
+.menu-nav-link-active {
+  font-weight: 600;
+}
+
+.custom-tab-label .tab-nav-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 12px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* 组合选择器提高优先级，避免被 kdesign 的 .kd-icon 覆盖 */
+.home-nav-link .home-nav-icon {
+  color: #59565e;
+  font-size: 20px;
+  transition: color 0.2s;
+}
+
+.home-nav-link:hover .home-nav-icon {
+  color: #29C392;
+}
+
+/* 首页激活态：图标显示主题绿 + 浅绿底，明确标识"当前在首页" */
+.home-nav-link.home-nav-link-active {
+  color: #29C392;
+}
+
+.home-nav-link.home-nav-link-active .home-nav-icon {
+  color: #29C392;
+}
+
+/* ==========================================
+   6. 菜单来源状态条（数据库 / 本地兜底 + 刷新）
+   -------------------------------------------------
+   与 kdesign 深色 Sider 同色系，放在菜单列表下方，不参与菜单点击逻辑
+   ========================================== */
+.menu-source {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 10px;
+  background: #2f3342;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.menu-source-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-source-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #29C392;
+}
+
+.menu-source-state.is-local .menu-source-dot {
+  background: #e8a33d;
+}
+
+.menu-source-refresh {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.menu-source-refresh:hover:not(:disabled) {
+  border-color: #29C392;
+  color: #29C392;
+}
+
+.menu-source-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 数据库里登记了、但前端还没注册组件的菜单项 */
+.pane-placeholder {
+  padding: 1.5em;
+  color: #555;
+  text-align: left;
+}
+
+.pane-placeholder code {
+  font-size: 13px;
+}
+
+/* ==========================================
+   7. 示例业务页
+   ========================================== */
+.sale-title {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
 }

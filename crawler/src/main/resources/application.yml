@@ -3,15 +3,15 @@
 # 位置：crawler/src/main/resources/application.yml
 #
 # crawler 是纯 Java SE 模块（CrawlerService.main 启动），不走 Spring Boot，
-# 因此由 config/CrawlerConfig 使用 SnakeYAML 读取本文件，按扁平 key 取值。
+# 因此由根包 CrawlerConfig 使用 SnakeYAML 读取本文件，按扁平 key 取值。
 #
 # 覆盖优先级：JVM 参数 > 环境变量 > 本文件
 #   -Dcrawler.schedule.time=09:30
 #   CRAWLER_SCHEDULE_TIME=09:30
 #   （环境变量规则：key 转大写，'.' 与 '-' 均替换为 '_'）
 #
-# 四大组件：downloader / processor / scheduler / pipeline
-# Mapper XML：resources/mapper/ShfeMapper.xml（由 config/DbConfig 手工加载）
+# 模块结构：四大组件 downloader / processor / scheduler / pipeline + spider + guard
+# 持久层：实体与 Mapper 全部来自 common 模块（XML 在 common/resources/mapper/，由 pipeline/DbConfig 加载）
 # 落库表：md_price_shfe（库中已存在的统一价格宽表，本模块只写入、不建表不删表）
 # ============================================================
 
@@ -33,8 +33,8 @@ crawler:
   db:
     # 启动时尝试 CREATE DATABASE IF NOT EXISTS（账号无 CREATE 权限会自动跳过，不中断启动）
     auto-create-database: true
-    # 多个 mapper XML 用英文逗号分隔；DbConfig 会逐个手工加载（纯 Java SE，无 Spring 扫描）
-    mapper-locations: "mapper/ShfeMapper.xml,mapper/PriceMapper.xml,mapper/CrawlMetaMapper.xml"
+    # common 的 8 个 Mapper XML（与数据库 8 张表一一对应），逗号分隔，DbConfig 逐个手工加载
+    mapper-locations: "mapper/MdCrawlFieldMapper.xml,mapper/MdCrawlLogMapper.xml,mapper/MdPriceCjMapper.xml,mapper/MdPriceSgeMapper.xml,mapper/MdPriceShfeMapper.xml,mapper/MdPriceSmmMapper.xml,mapper/MdSourceProductMapper.xml,mapper/SysMenuMapper.xml"
     # 启动前检查四张价格表 + md_source_product 的字段是否齐全；缺字段直接报错，不静默丢数据
     field-check: true
 
@@ -162,6 +162,13 @@ crawler:
     discovery:
       enabled: true
       cache-minutes: 10
+    # 定时调度：开盘后 30 分钟内采一次，收盘后采一次
+    # 第一次 = open-time + open-delay-minutes（默认 09:00 + 30 = 09:30，采当日早间报价）
+    # 第二次 = market-close.close-times.CJ + close-delay-minutes（默认 15:00 + 10 = 15:10，定稿价幂等覆盖早间价）
+    schedule:
+      open-time: "09:00"
+      open-delay-minutes: 30
+      close-delay-minutes: 10
     downloader:
       save-enabled: true
       save-dir: "data/cj"
@@ -208,6 +215,12 @@ crawler:
     discovery:
       enabled: true
       cache-minutes: 10
+    # 定时调度：与 CJ 同一套规则（开盘后 30 分钟内一次、收盘后一次），
+    # 收盘时间取 market-close.close-times.SMM（默认 17:00）→ 第二次默认 17:10
+    schedule:
+      open-time: "09:00"
+      open-delay-minutes: 30
+      close-delay-minutes: 10
     # 25 个专区；可用逗号分隔覆盖。实测去重后约 262 个合约 id。
     category-slugs: "copper,aluminum,lead,zinc,nickel,tin,magnesium,silicon,titanium,stainless-steel,chromium,manganese,tungsten,precious-metals,rare-earth,antimony,in-ge-ga,bi-se-te,other-minor-metals,metal-scraps,photovoltaic,semiconductor,wirecable,huanan"
     downloader:
@@ -257,11 +270,15 @@ crawler:
       SGE: "15:30"
       CJ: "15:00"
       SMM: "17:00"
-    # crawler 独立运行没有 Spring 节假日库，用配置兜底（yyyy-MM-dd，逗号分隔）
+    # 交易日/工作日来自 common.MicaHolidays（mica 官方 2019~2026 节假日库，含调休）；
+    # 下面两项仅作额外覆盖（yyyy-MM-dd，逗号分隔），一般留空即可
     holidays: ""
     extra-workdays: ""
 
   schedule:
     enabled: true
-    time: "08:00"
     zone: Asia/Shanghai
+    # SHFE / SGE 的每日触发时间（CJ / SMM 由各自 schedule 块按开/收盘时间推算，不在此配置）
+    times:
+      shfe: "10:00,15:40"
+      sge: "10:00,15:40"

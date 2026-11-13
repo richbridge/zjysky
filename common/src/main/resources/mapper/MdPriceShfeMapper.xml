@@ -1,23 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zjysky.crawler.mapper.ShfeMapper">
 
-    <!-- ============================================================
-        目标表 md_price_shfe 是库中已存在的统一价格宽表（36 列），
-        此处不建表、不改表。启动前用 listColumns 做字段完整性自检。
-        唯一键：uk_price(task_type, trade_date, symbol)
-        ============================================================ -->
+<mapper namespace="com.zjysky.common.database.mapper.MdPriceShfeMapper">
 
-    <select id="listColumns" resultType="java.lang.String">
-        SELECT COLUMN_NAME
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = #{tableName}
-        ORDER BY ORDINAL_POSITION
-    </select>
-
-    <!-- 批量写入：命中唯一键则更新全部业务列，重复采集幂等 -->
+    <!-- md_price_shfe：唯一键 (task_type, trade_date, symbol) -->
     <insert id="upsertBatch">
         INSERT INTO md_price_shfe
         (task_type, row_type, trade_date, symbol,
@@ -70,5 +57,12 @@
             raw_json             = VALUES(raw_json),
             update_time          = CURRENT_TIMESTAMP
     </insert>
+
+    <!-- 收盘定稿后删除同日 REALTIME 行 -->
+    <delete id="deleteRealtimeByDate">
+        DELETE FROM md_price_shfe
+        WHERE task_type  = #{realtimeTaskType}
+          AND trade_date = #{tradeDate}
+    </delete>
 
 </mapper>
