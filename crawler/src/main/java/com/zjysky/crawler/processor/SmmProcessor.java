@@ -104,8 +104,6 @@ public final class SmmProcessor extends AbstractSpotProcessor {
             }
             products.add(newProduct(productId, productName, group));
         }
-        System.out.println(">>> [SMM 品种发现] 共 " + products.size()
-                + " 个合约，页面 " + raw.length() + " 字符，URL=" + page.getUrl());
         page.putField(PriceSupport.SOURCE_PRODUCTS, products);
     }
 }

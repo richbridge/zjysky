@@ -64,8 +64,6 @@ public final class CjProcessor extends AbstractSpotProcessor {
             collectAnchors(page.getHtml(), defaultGroup, seen, products);
         }
 
-        System.out.println(">>> [CJ 品种发现] 共 " + products.size()
-                + " 个合约，页面 " + raw.length() + " 字符，URL=" + page.getUrl());
         page.putField(PriceSupport.SOURCE_PRODUCTS, products);
     }
 

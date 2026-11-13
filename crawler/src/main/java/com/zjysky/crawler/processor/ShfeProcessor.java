@@ -155,8 +155,6 @@ public class ShfeProcessor implements PageProcessor {
                 out.add(d);
             }
         }
-        System.out.println(">>> [SHFE] 当日延时行情解析完成: " + out.size()
-                + " 条，task_type=" + taskType);
         return out;
     }
 
@@ -197,8 +195,6 @@ public class ShfeProcessor implements PageProcessor {
         parseProducts(root.getJSONArray("o_curproduct"), taskType, tradeDate, updateTime, list);
         parseMetalIndex(root.getJSONArray("o_curmetalindex"), taskType, tradeDate, updateTime,
                 indexSymbol, list);
-        System.out.println(">>> [SHFE] 历史日行情解析完成: " + tradeDate
-                + " 共 " + list.size() + " 条，task_type=" + taskType);
         return list;
     }
 

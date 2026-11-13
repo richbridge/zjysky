@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.zjysky.common.database.mapper.MdCrawlLogMapper">
+
+    <!-- md_crawl_log：流水表，只 INSERT -->
+    <insert id="insertLog">
+        INSERT INTO md_crawl_log
+        (source, task_type, status, records, requests, pages,
+         cost_ms, message, start_time, end_time)
+        VALUES
+        (#{source}, #{taskType}, #{status}, #{records}, #{requests}, #{pages},
+         #{costMs}, #{message}, #{startTime}, #{endTime})
+    </insert>
+
+    <select id="listLogs" resultType="com.zjysky.common.database.entity.MdCrawlLog">
+        SELECT id, source, task_type, status, records, requests, pages,
+               cost_ms, message, start_time, end_time, create_time
+        FROM md_crawl_log
+        WHERE 1 = 1
+        <if test="source != null and source != ''">
+            AND source = #{source}
+        </if>
+        <if test="taskType != null and taskType != ''">
+            AND task_type = #{taskType}
+        </if>
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

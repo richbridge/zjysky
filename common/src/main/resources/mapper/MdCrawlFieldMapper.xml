@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.zjysky.common.database.mapper.MdCrawlFieldMapper">
+
+    <!-- md_crawl_field：唯一键 (source, task_type, field_name)，重复采集更新统计值 -->
+    <insert id="upsertFields">
+        INSERT INTO md_crawl_field
+        (source, task_type, field_name, column_name, non_empty_rate, sample_value, update_time)
+        VALUES
+        <foreach collection="list" item="it" separator=",">
+            (#{it.source}, #{it.taskType}, #{it.fieldName}, #{it.columnName},
+             #{it.nonEmptyRate}, #{it.sampleValue}, NOW())
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            column_name    = VALUES(column_name),
+            non_empty_rate = VALUES(non_empty_rate),
+            sample_value   = VALUES(sample_value),
+            update_time    = NOW()
+    </insert>
+
+    <select id="listFields" resultType="com.zjysky.common.database.entity.MdCrawlField">
+        SELECT id, source, task_type, field_name, column_name,
+               non_empty_rate, sample_value, first_seen_time, update_time
+        FROM md_crawl_field
+        WHERE 1 = 1
+        <if test="source != null and source != ''">
+            AND source = #{source}
+        </if>
+        <if test="taskType != null and taskType != ''">
+            AND task_type = #{taskType}
+        </if>
+        ORDER BY source, task_type, non_empty_rate DESC, field_name
+    </select>
+
+</mapper>

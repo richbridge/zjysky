@@ -1,0 +1,360 @@
+diff --git a/es/_utils/usePopper.js b/es/_utils/usePopper.js
+index 40c06bbfe84275deb46a303d567196c8951491bb..400d77aa0853a68507d03c386b7f37dbaed246fa 100644
+--- a/es/_utils/usePopper.js
++++ b/es/_utils/usePopper.js
+@@ -172,13 +172,13 @@ function usePopper(locatorElement, popperElement, props) {
+   var locatorRef = locatorElement.ref || locatorEl;
+   var popperRef = popperElement.ref || popperEl;
+   var container = getPopupContainer(getRealDom(locatorRef, locatorElement) || document.body);
+-  _Promise.resolve().then(function () {
++  useEffect(function () {
+     var realDom = getRealDom(locatorRef, locatorElement);
+     var triggerNode = getTriggerElement(realDom);
+-    var container = getPopupContainer(realDom);
++    var popupContainer = getPopupContainer(realDom);
+     devWarning(!triggerNode, componentName, "getTriggerElement() must return a HTMLElement, but now it does not return anything");
+-    devWarning(!container, componentName, "getPopupContainer() must return a HTMLElement, but now it does not return anything");
+-  });
++    devWarning(!popupContainer, componentName, "getPopupContainer() must return a HTMLElement, but now it does not return anything");
++  }, []);
+   var initPos = {
+     top: 0,
+     left: 0,
+diff --git a/es/alert/alert.js b/es/alert/alert.js
+index 6966092a41efea9333d088bcaba20b4127014916..ca16f9fed0dcc9f236c45151ad092ed902b6c793 100644
+--- a/es/alert/alert.js
++++ b/es/alert/alert.js
+@@ -16,7 +16,7 @@ var __rest = this && this.__rest || function (s, e) {
+   return t;
+ };
+ import React, { useContext, useEffect, useState, useRef, useCallback } from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import ReactDOM from 'react-dom';
+ import { tuple } from '../_utils/type';
+ import classNames from 'classnames';
+diff --git a/es/anchor/anchor.js b/es/anchor/anchor.js
+index a4aa78986a85305ee62a04e606b277b8aaf4470c..803608d02bee3a1cb5cba9473e2532d97b699a4a 100644
+--- a/es/anchor/anchor.js
++++ b/es/anchor/anchor.js
+@@ -13,7 +13,7 @@ import { getCompProps } from '../_utils';
+ import { tuple } from '../_utils/type';
+ import AnchorContext from './context';
+ import devWarning from '../_utils/devwarning';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import usePopper from '../_utils/usePopper';
+ import { toArray } from '../_utils/react-children';
+ import { useResizeObserver } from '../_utils/hooks';
+diff --git a/es/avatar/avatar.js b/es/avatar/avatar.js
+index e071b70e25102cf5b1819d11fe06aa9c4c154024..ec1d785bb3d5769d7ee53d012b2b7b3a99c863db 100644
+--- a/es/avatar/avatar.js
++++ b/es/avatar/avatar.js
+@@ -8,7 +8,7 @@ import ConfigContext from '../config-provider/ConfigContext';
+ import { tuple } from '../_utils/type';
+ import { getCompProps } from '../_utils';
+ import devWarning from '../_utils/devwarning';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ export var AvatarSizes = tuple('large', 'middle', 'small', 'extra-small');
+ export var AvatarShapes = tuple('circle', 'square');
+ var InternalAvatar = function InternalAvatar(props, ref) {
+diff --git a/es/base-data/base-data.js b/es/base-data/base-data.js
+index 0e79f6d2b3e534c1b32a8227c7ba573ddb13a466..b94deeb19fa9cb851aa8e709cce855d95e3ab09b 100644
+--- a/es/base-data/base-data.js
++++ b/es/base-data/base-data.js
+@@ -14,7 +14,12 @@ import React, { useContext, useRef, useState, useEffect, useLayoutEffect, useCal
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+-import { Input, Icon, Tabs, Empty, Spin, Checkbox } from '../index';
++import Input from '../input';
++import Icon from '../icon';
++import Tabs from '../tabs';
++import Empty from '../empty';
++import Spin from '../spin';
++import Checkbox from '../checkbox';
+ import usePopper from '../_utils/usePopper';
+ import ResizeObserver from '../_utils/resizeObserver';
+ var InternalBaseData = function InternalBaseData(props, ref) {
+diff --git a/es/button/button.js b/es/button/button.js
+index 52ecaa8d908f548789f250026a06c6fd086aa306..ebb4b5a3d6313f182e0c47c673ef4af894bdf662 100644
+--- a/es/button/button.js
++++ b/es/button/button.js
+@@ -11,7 +11,7 @@ var __rest = this && this.__rest || function (s, e) {
+   return t;
+ };
+ import React, { useContext } from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+diff --git a/es/button/group.js b/es/button/group.js
+index e6e95b5e0cc9951a2ccaca2de233ff1b386059b5..cd26dbe52156f156e94f7184d54c424a1aebf289 100644
+--- a/es/button/group.js
++++ b/es/button/group.js
+@@ -7,7 +7,8 @@ import React, { useContext, useState, useCallback } from 'react';
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+-import { Button, Icon } from '../index';
++import Button from './button';
++import Icon from '../icon';
+ import { toArray } from '../_utils/react-children';
+ import { tuple } from '../_utils/type';
+ import Popper from '../popper';
+diff --git a/es/city-picker/city-picker.js b/es/city-picker/city-picker.js
+index 04fa8fb50bbbfc5a9037be8b0c414820ead1e1df..4705d2e2b1859b3c859ebd2c79bdd67f78397d65 100644
+--- a/es/city-picker/city-picker.js
++++ b/es/city-picker/city-picker.js
+@@ -21,7 +21,9 @@ import { useMergedState } from '../_utils/hooks';
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+-import { Icon, Tabs, Spin } from '../index';
++import Icon from '../icon';
++import Tabs from '../tabs';
++import Spin from '../spin';
+ import Popper from '../popper';
+ import Option from './option';
+ import escapeRegExp from 'lodash/escapeRegExp';
+diff --git a/es/color-picker/color-picker-panel.js b/es/color-picker/color-picker-panel.js
+index 52e948fac8a50f46a3e5292434a818ee25cd5244..26c32b19cdeaed7fd5ca805ccfee627528525bf4 100644
+--- a/es/color-picker/color-picker-panel.js
++++ b/es/color-picker/color-picker-panel.js
+@@ -6,7 +6,9 @@ import _filterInstanceProperty from "@babel/runtime-corejs3/core-js-stable/insta
+ import _mapInstanceProperty from "@babel/runtime-corejs3/core-js-stable/instance/map";
+ import _fillInstanceProperty from "@babel/runtime-corejs3/core-js-stable/instance/fill";
+ import React, { useContext, useRef, useEffect, useState } from 'react';
+-import { Input, Select, Switch } from '../index';
++import Input from '../input';
++import Select from '../select';
++import Switch from '../switch';
+ import classNames from 'classnames';
+ import { ConfigContext } from '../config-provider';
+ import { systemPresetColor } from './constant/systemPresetColor';
+diff --git a/es/color-picker/color-picker.js b/es/color-picker/color-picker.js
+index ab4c93a42645e99c9be43bd850945d4badab8df2..34330ccabb387123630a2c412fe3e1b9782ef5b8 100644
+--- a/es/color-picker/color-picker.js
++++ b/es/color-picker/color-picker.js
+@@ -14,7 +14,7 @@ var __rest = this && this.__rest || function (s, e) {
+ import React, { useContext, useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+ import classNames from 'classnames';
+ import { ConfigContext } from '../config-provider';
+-import { Input } from '../index';
++import Input from '../input';
+ import { validateColor } from './utils/validateColor';
+ import { colorTypes } from './constant/colorTypes';
+ import ColorPickerPanel from './color-picker-panel';
+diff --git a/es/config-provider/compDefaultProps.js b/es/config-provider/compDefaultProps.js
+index a70800df543380331aae6691c604cc2cd26da11f..09ac5aff3fbbf113797cdb53f8b50e0fe396a534 100644
+--- a/es/config-provider/compDefaultProps.js
++++ b/es/config-provider/compDefaultProps.js
+@@ -1,5 +1,5 @@
+ import * as React from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ var compDefaultProps = {
+   Alert: {
+     type: 'warning',
+diff --git a/es/drawer/drawer.js b/es/drawer/drawer.js
+index bc6e82741eb99963510f7c3ac123b294cdd08062..a87926aead5953899c4c2f847db6b733c56d957c 100644
+--- a/es/drawer/drawer.js
++++ b/es/drawer/drawer.js
+@@ -5,7 +5,7 @@ import _includesInstanceProperty from "@babel/runtime-corejs3/core-js-stable/ins
+ import _concatInstanceProperty from "@babel/runtime-corejs3/core-js-stable/instance/concat";
+ import _filterInstanceProperty from "@babel/runtime-corejs3/core-js-stable/instance/filter";
+ import React, { useContext, useEffect, useState, useCallback, createRef, useRef } from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import ReactDOM from 'react-dom';
+ import { tuple } from '../_utils/type';
+ import classNames from 'classnames';
+diff --git a/es/input/ClearableLabeledInput.js b/es/input/ClearableLabeledInput.js
+index cd7c93d2863f1ecd819d56d162b523d2b37b584f..8067b08b157b7fbd13b68284965ee4c39dd5a88f 100644
+--- a/es/input/ClearableLabeledInput.js
++++ b/es/input/ClearableLabeledInput.js
+@@ -2,7 +2,7 @@ import _defineProperty from "@babel/runtime-corejs3/helpers/defineProperty";
+ import _slicedToArray from "@babel/runtime-corejs3/helpers/slicedToArray";
+ import _concatInstanceProperty from "@babel/runtime-corejs3/core-js-stable/instance/concat";
+ import React, { useRef, useState } from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import classNames from 'classnames';
+ import { tuple } from '../_utils/type';
+ var ClearableInputType = tuple('input', 'text');
+diff --git a/es/menu/subMenu.js b/es/menu/subMenu.js
+index 8037fa1e2506fbf7fd7f74f866cf60dcbd4abddb..2ceb79e84c506e357f7bf828599bc328a9568dcc 100644
+--- a/es/menu/subMenu.js
++++ b/es/menu/subMenu.js
+@@ -20,7 +20,7 @@ import { toArray } from '../_utils/react-children';
+ import classNames from 'classnames';
+ import { isString, getItemWidth, renderReactNodeFunction, isElementInViewport, DEFAUTL_PADDING } from './util';
+ import { useOnClickOutside } from '../_utils/hooks';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import usePopper from '../_utils/usePopper';
+ import devWarning from '../_utils/devwarning';
+ import { MENU_ITEM_CONTAINER_NAME } from './menuItem';
+diff --git a/es/modal/modal.js b/es/modal/modal.js
+index 41b9cf3e8b47dadf3fa74cb439eb631eb59e1213..9ddeeda22c1130dcaf76fe3aca2ac579b7a5f8a8 100644
+--- a/es/modal/modal.js
++++ b/es/modal/modal.js
+@@ -13,7 +13,7 @@ var __rest = this && this.__rest || function (s, e) {
+   return t;
+ };
+ import React, { useContext, useEffect, useState, useRef, useCallback } from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import Button from '../button/button';
+ import ReactDOM from 'react-dom';
+ import { tuple } from '../_utils/type';
+diff --git a/es/search/quick-search.js b/es/search/quick-search.js
+index 2e2bf0599aa57d93537f101f8538f9c9e3b5f014..5ab776f6758991ed3f9b38792aff7912b794aa82 100644
+--- a/es/search/quick-search.js
++++ b/es/search/quick-search.js
+@@ -23,7 +23,7 @@ import ConfigContext from '../config-provider/ConfigContext';
+ import { toArray } from '../_utils/react-children';
+ import usePopper from '../_utils/usePopper';
+ import Option from './option';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import { getStringToArray } from '../_utils/arrayUtil';
+ var INPUT_MIN_WIDTH = 4;
+ var InternalQuickSearch = function InternalQuickSearch(props, ref) {
+diff --git a/es/search/search-panel.js b/es/search/search-panel.js
+index 8b03caf2f295ea7fa98734c021a91c731786668b..7530ecf3fa0d5016141e9511ac079d58642efcde 100644
+--- a/es/search/search-panel.js
++++ b/es/search/search-panel.js
+@@ -6,7 +6,11 @@ import _concatInstanceProperty from "@babel/runtime-corejs3/core-js-stable/insta
+ import _Object$keys from "@babel/runtime-corejs3/core-js-stable/object/keys";
+ import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
+ import classNames from 'classnames';
+-import { Input, Tooltip, Icon, Spin, Image } from '../index';
++import Input from '../input';
++import Tooltip from '../tooltip';
++import Icon from '../icon';
++import Spin from '../spin';
++import Image from '../image';
+ import ConfigContext from '../config-provider/ConfigContext';
+ var InternalSearchPanel = function InternalSearchPanel(props, ref) {
+   var _context4, _context5, _context6;
+diff --git a/es/search/search.js b/es/search/search.js
+index 8b94b1ca82f83649dba7aa81d985b4ca645937df..4e6232fd58da76226d44b204cc5b9378db5c019d 100644
+--- a/es/search/search.js
++++ b/es/search/search.js
+@@ -17,7 +17,8 @@ import ConfigContext from '../config-provider/ConfigContext';
+ import QuickSearch from './quick-search';
+ import SearchPanel from './search-panel';
+ import { getCompProps } from '../_utils';
+-import { Input, Icon } from '../index';
++import Input from '../input';
++import Icon from '../icon';
+ import { SearchSizeTypes, BorderTypes, SearchTypes } from './interface';
+ import devWarning from '../_utils/devwarning';
+ var InternalSearch = function InternalSearch(props, ref) {
+diff --git a/es/select/option.js b/es/select/option.js
+index c8b0bd233c86baefeddb8c715d8f7b7cbee81306..c3e642b2801dd25f8862f50b7967acfc698093cf 100644
+--- a/es/select/option.js
++++ b/es/select/option.js
+@@ -6,7 +6,7 @@ import _valuesInstanceProperty from "@babel/runtime-corejs3/core-js-stable/insta
+ import React, { useContext, useRef, useEffect, useState } from 'react';
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+-import { Checkbox } from '../index';
++import Checkbox from '../checkbox';
+ var InternalOption = function InternalOption(props, ref) {
+   var _classNames;
+   var optionRef = useRef(null) || ref;
+diff --git a/es/select/select.js b/es/select/select.js
+index d262179f1c9b5dbe57aaf496699b3f852c7f4d15..30bcb5e5a9904db453349fc75859303cfd152336 100644
+--- a/es/select/select.js
++++ b/es/select/select.js
+@@ -23,7 +23,9 @@ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+ import { toArray } from '../_utils/react-children';
+-import { Icon, Checkbox, Tag } from '../index';
++import Icon from '../icon';
++import Checkbox from '../checkbox';
++import Tag from '../tag';
+ import Option from './option';
+ import Popper from '../popper';
+ import VirtualList from '../virtual-list';
+diff --git a/es/steps/Steps.js b/es/steps/Steps.js
+index e89e7ae2ded5f60768dd9e5ea8227e80f4a65d12..80f1ca6d7ef5c570a5b89e3eefc8407bc2df0515 100644
+--- a/es/steps/Steps.js
++++ b/es/steps/Steps.js
+@@ -17,7 +17,7 @@ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+ import devWarning from '../_utils/devwarning';
+ import { toArray } from '../_utils/react-children';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import { Directions, Statuses, LabelPlacements } from './interface';
+ var Steps = function Steps(props) {
+   var _context, _classNames, _context2;
+diff --git a/es/table/table.js b/es/table/table.js
+index 0f47e661e392b692fa626a8b3a1bdb0f7ef2fe4c..87973b3d3d8132ef194d307af2df3db827b1fcb6 100644
+--- a/es/table/table.js
++++ b/es/table/table.js
+@@ -15,7 +15,8 @@ import { Table as BaseTable, useTablePipeline } from '@kdcloudjs/table';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import Checkbox from '../checkbox/index';
+ import Radio from '../radio/index';
+-import { Spin, Empty } from '../index';
++import Spin from '../spin';
++import Empty from '../empty';
+ import useRowSelection from './feature/rowSelection';
+ import useRowDetail from './feature/rowDetail';
+ import useFilter from './feature/filter';
+diff --git a/es/tag/tag.js b/es/tag/tag.js
+index 20038ac82a299139bf9ee83fd4d63f43eff7f29e..fde538198de96df7424b4e456d03bb9ff85cde41 100644
+--- a/es/tag/tag.js
++++ b/es/tag/tag.js
+@@ -11,7 +11,7 @@ var __rest = this && this.__rest || function (s, e) {
+   return t;
+ };
+ import React, { useContext, useRef } from 'react';
+-import { Icon } from '../index';
++import Icon from '../icon';
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { tuple } from '../_utils/type';
+diff --git a/es/tree/treeNode.js b/es/tree/treeNode.js
+index c5c896ca2f3693deecf22809d20fc2d9d0acd299..2361d61e2710e3a03b04f889396ed7cf0f1ea380 100644
+--- a/es/tree/treeNode.js
++++ b/es/tree/treeNode.js
+@@ -18,7 +18,7 @@ import { getCompProps } from '../_utils';
+ import Checkbox from './../checkbox';
+ import Icon from '../icon';
+ import Spin from '../spin';
+-var TreeNode = React.forwardRef(function (props) {
++var TreeNode = React.forwardRef(function (props, ref) {
+   var _context;
+   var _useContext = useContext(ConfigContext),
+     getPrefixCls = _useContext.getPrefixCls,
+@@ -290,6 +290,7 @@ var TreeNode = React.forwardRef(function (props) {
+     }
+   }, [onDrop, nodeData, nodeKey]);
+   return React.createElement("div", {
++    ref: ref,
+     className: classNames("".concat(treeNodePrefixCls, "-item"), _defineProperty({}, "".concat(treeNodePrefixCls, "-item-hover"), !disabled && selectable && expandOnClickNode), _defineProperty({}, "".concat(treeNodePrefixCls, "-selected"), selected && selectable && !disabled && expandOnClickNode), _defineProperty({}, "".concat(treeNodePrefixCls, "-disabled"), disabled), _defineProperty({}, "".concat(treeNodePrefixCls, "-opened"), expandState), _concatInstanceProperty(_context = "".concat(treeNodePrefixCls, "-item-")).call(_context, nodeKey), className),
+     style: _extends({
+       height: "".concat(estimatedItemSize, "px")
+diff --git a/es/tree-select/tree-select.js b/es/tree-select/tree-select.js
+index 18da867afe2111bdee33bc80530a4a007029a095..587a76f893422ba2f935f139a2e7ad033f43d71b 100644
+--- a/es/tree-select/tree-select.js
++++ b/es/tree-select/tree-select.js
+@@ -12,7 +12,9 @@ import { useMergedState } from '../_utils/hooks';
+ import classNames from 'classnames';
+ import ConfigContext from '../config-provider/ConfigContext';
+ import { getCompProps } from '../_utils';
+-import { Icon, Tag, Tree } from '../index';
++import Icon from '../icon';
++import Tag from '../tag';
++import Tree from '../tree';
+ import usePopper from '../_utils/usePopper';
+ var INPUT_MIN_WIDTH = 4;
+ function flattenTreeData(treeData) {

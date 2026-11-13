@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.zjysky.common.database.mapper.MdSourceProductMapper">
+
+    <!-- md_source_product：唯一键 (source, product_id) -->
+    <insert id="upsertProducts">
+        INSERT INTO md_source_product
+        (source, product_id, product_name, product_group, enabled)
+        VALUES
+        <foreach collection="list" item="it" separator=",">
+            (#{it.source}, #{it.productId}, #{it.productName},
+             #{it.productGroup}, IFNULL(#{it.enabled}, 1))
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            product_name  = VALUES(product_name),
+            product_group = VALUES(product_group),
+            enabled       = VALUES(enabled),
+            update_time   = CURRENT_TIMESTAMP
+    </insert>
+
+    <select id="listProducts" resultType="com.zjysky.common.database.entity.MdSourceProduct">
+        SELECT id, source, product_id, product_name, product_group, enabled,
+               create_time, update_time
+        FROM md_source_product
+        WHERE source = #{source}
+        ORDER BY product_id
+    </select>
+
+    <select id="findProductName" resultType="java.lang.String">
+        SELECT product_name
+        FROM md_source_product
+        WHERE source = #{source}
+          AND product_id = #{productId}
+        LIMIT 1
+    </select>
+
+</mapper>

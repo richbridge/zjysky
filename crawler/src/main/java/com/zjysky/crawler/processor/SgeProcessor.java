@@ -184,8 +184,6 @@ public class SgeProcessor implements PageProcessor {
             page.setSkip(true);
             return;
         }
-        System.out.println(">>> [SGE] Excel 解析完成: " + list.size() + " 行，日期="
-                + list.get(0).getTradeDate() + "，task_type=" + taskType);
         page.putField("sgeList", list);
     }
 
@@ -274,8 +272,6 @@ public class SgeProcessor implements PageProcessor {
             page.setSkip(true);
             return;
         }
-        System.out.println(">>> [SGE 实时] 延时行情解析完成: " + list.size()
-                + " 个合约，日期=" + tradeDate + "，task_type=" + taskType);
         page.putField("sgeList", list);
     }
 

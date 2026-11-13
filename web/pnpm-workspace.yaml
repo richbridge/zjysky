@@ -1,0 +1,6 @@
+allowBuilds:
+  '@kdcloudjs/kdesign': false
+  core-js: false
+  core-js-pure: false
+patchedDependencies:
+  '@kdcloudjs/kdesign@1.8.74': patches/@kdcloudjs__kdesign@1.8.74.patch
